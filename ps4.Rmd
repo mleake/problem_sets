@@ -1,61 +1,208 @@
 ---
 title: 'Psych 251 PS4: Simulation'
-author: "Mike Frank"
+author: "Mackenzie Leake"
 date: "2018"
 output: 
   html_document:
     toc: true
 ---
 
-This is problem set #3, in which we want you to integrate your knowledge of data wrangling with some basic simulation skills and some linear modeling.
+> This is problem set #3, in which we want you to integrate your knowledge of data wrangling with some basic simulation skills and some linear modeling.
 
-For ease of reading, please separate your answers from our text by marking our text with the `>` character (indicating quotes). 
+> For ease of reading, please separate your answers from our text by marking our text with the `>` character (indicating quotes). 
 
 ```{r}
 library(tidyverse)
 ```
 
-Let's start by convincing ourselves that t-tests have the appropriate false positive rate. Run 10,000 t-tests with standard, normally-distributed data from a made up 30-person, single-measurement experiment (the command for sampling from a normal distribution is `rnorm`). What's the mean number of "significant" results?
+> Let's start by convincing ourselves that t-tests have the appropriate false positive rate. Run 10,000 t-tests with standard, normally-distributed data from a made up 30-person, single-measurement experiment (the command for sampling from a normal distribution is `rnorm`). What's the mean number of "significant" results?
 
-First do this using a `for` loop.
+> First do this using a `for` loop.
 
 ```{r}
+sig_count <- 0        #count num of significant results
+num_tests <- 10000    #total number of trials to run
+sig_value <- 0.05     #significance threshold
+num_people <- 30      #number of people in trial
+total_range <- seq(1, num_tests) #sets up indices for loop
+
+for (val in total_range) {
+    data <- rnorm(num_people, mean = 0, sd = 1)
+    result <- t.test(data)
+    pvalue <- result$p.value
+    if(pvalue < sig_value) {
+      sig_count = sig_count + 1
+    }
+}
+print(c("The number of significant results out of 10000 trials is: ", toString(sig_count)), quote=FALSE)
 ```
 
-Next, do this using the `replicate` function:
+
+> Next, do this using the `replicate` function:
 
 ```{r}
+sig_value <- 0.05     #significance threshold
+
+determine_sig <- function(n) {
+   data <- rnorm(n, mean = 0, sd = 1)
+   result <- t.test(data)
+   pvalue <- result$p.value
+   if(pvalue < sig_value) {
+     result <- 1
+   }
+   else {
+     result <- 0
+   }
+   return(result)
+}
+
+is_sig_vector <- sum(replicate(
+  10000, determine_sig(30)))
+
+print(c("The number of significant results out of 10000 trials is: ", toString(is_sig_vector)), quote=FALSE)
 ```
 
-Ok, that was a bit boring. Let's try something more interesting - let's implement a p-value sniffing simulation, in the style of Simons, Nelson, & Simonsohn (2011).
+The mean number of significant results computed both ways is approximately 500, as expected.
 
-Consider this scenario: you have done an experiment, again with 30 participants (one observation each, just for simplicity). The question is whether their performance is above chance. You aren't going to check the p-value every trial, but let's say you run 30 - then if the p-value is within the range p < .25 and p > .05, you optionally run 30 more and add those data, then test again. But if the original p value is < .05, you call it a day, and if the original is > .25, you also stop.  
+> Ok, that was a bit boring. Let's try something more interesting - let's implement a p-value sniffing simulation, in the style of Simons, Nelson, & Simonsohn (2011).
 
-First, write a function that implements this sampling regime.
+> Consider this scenario: you have done an experiment, again with 30 participants (one observation each, just for simplicity). The question is whether their performance is above chance. You aren't going to check the p-value every trial, but let's say you run 30 - then if the p-value is within the range p < .25 and p > .05, you optionally run 30 more and add those data, then test again. But if the original p value is < .05, you call it a day, and if the original is > .25, you also stop.  
+
+> First, write a function that implements this sampling regime.
 
 ```{r}
+num_people <- 30      #number of people in trial
+
 double.sample <- function () {
+  data <- rnorm(num_people, mean = 0, sd = 1)
+  result <- t.test(data)
+  pvalue <- result$p.value
+  if (pvalue < 0.05 || pvalue > 0.25 ) { #stop execution if p < .05 or p > .25
+    #print(c("the length of the sample is:", toString(length(data))), quote=FALSE)
+    return(pvalue)
+  }
+  else {
+    new_data <- rnorm(num_people, mean = 0, sd = 1) #second batch of 30
+    data <- rbind(data, new_data) # combine new data with old
+    result <- t.test(data)
+    pvalue <- result$p.value
+    #print(c("the length of the sample is:", toString(length(data))), quote=FALSE)
+    return(pvalue)
+  }
+}
+
+print(c("The resulting p-value of a single sample is: ", toString(double.sample())), quote=FALSE)
+```
+
+> Now call this function 10k times and find out what happens. 
+
+```{r}
+p_values_double <- replicate(10000, double.sample()) #double sample 10k times
+h2 <- hist(p_values_double, breaks=20, plot=FALSE) #create histogram with 0.05 bin increments
+first_bar_double <- min(p_values_double) #identify the bar for 0 to 0.05
+bin_double <- as.numeric(cut(first_bar_double, h2$breaks)) #grab the bar for 0 to 0.05 
+plot(h2, col = replace(rep("white", length(h2$breaks) - 1), bin_double, "blue"), ylim=c(0, 800)) #add the blue bar for the area of interest
+text(h2$mids[1], 20 + h2$counts[1], labels=h2$counts[1], adj=c(0.5, -0.5)) #label first bar count
+```
+
+Here we see that the number of significant trials out of 10000 has increased from approximately 500 to 700 with our new "double the sample" sampling scheme. 
+
+Let's compare this to the single sampling scheme:
+
+```{r}
+single.sample <- function () {
+   data <- rnorm(num_people, mean = 0, sd = 1)
+   result <- t.test(data)
+   pvalue <- result$p.value
+   return(pvalue)
+}
+
+p_values_single <- replicate(10000, single.sample()) #only sample once
+h1 <- hist(p_values_single, breaks=20, plot=FALSE) #create histogram with 0.05 bin increments
+first_bar_single <- min(p_values_single) #identify the bar for 0 to 0.05
+bin_single <- as.numeric(cut(first_bar_single, h1$breaks)) #grab the bar for 0 to 0.05 
+
+par(mfrow=c(1,2)) 
+plot(h1, col = replace(rep("white", length(h1$breaks) - 1), bin_single, "blue"), ylim=c(0, 800)) #add the blue bar for the area of interest
+text(h1$mids[1], 20 + h1$counts[1], labels=h1$counts[1], adj=c(0.5, -0.5)) #label first bar count
+
+plot(h2, col = replace(rep("white", length(h2$breaks) - 1), bin_double, "blue"), ylim=c(0, 800)) #add the blue bar for the area of interest
+text(h2$mids[1], 20 + h2$counts[1], labels=h2$counts[1], adj=c(0.5, -0.5)) #label first bar count
+```
+
+> Is there an inflation of false positives? How bad is it?
+
+With this double the sample scheme we do see an inflation of false positives. The probability of getting p< 0.05 increases, as shown by the increase in the left-most bar of the histograms. The expected number of significant results is now approximately 700, as opposed to 500 in the single sampling condition.
+
+
+> Now modify this code so that you can investigate this "double the sample" rule in a bit more depth. Let's see what happens when you double the sample ANY time p > .05 (not just when p < .25), or when you do it only if p < .5 or < .75. How do these choices affect the false positive rate?
+
+> HINT: Try to do this by making the function `double.sample` take the upper p value as an argument, so that you can pass this through dplyr.
+
+> HINT 2: You may need more samples. Find out by looking at how the results change from run to run.
+
+```{r}
+num_people <- 30      #number of people in trial
+
+double.sample <- function(upper_p) {
+  data <- rnorm(num_people, mean = 0, sd = 1)
+  result <- t.test(data)
+  pvalue <- result$p.value
+  if (pvalue < 0.05 || pvalue > upper_p) { #stop execution
+    #print(c("the length of the sample is:", toString(length(data))), quote=FALSE)
+    return(pvalue)
+  }
+  new_data <- rnorm(num_people, mean = 0, sd = 1)
+  data <- rbind(data, new_data) # combine new data with old
+  result <- t.test(data)
+  pvalue <- result$p.value
+  #print(c("the length of the sample is:", toString(length(data))), quote=FALSE)
+  return(pvalue)
 }
 ```
 
-Now call this function 10k times and find out what happens. 
-
 ```{r}
+trial_num <- 20000
+p_values_double_nolimit <- replicate(trial_num, double.sample(1.1)) #chose upper above 1 to always sample if p > .05
+p_values_double_0_5 <- replicate(trial_num, double.sample(0.5))
+p_values_double_0_75 <- replicate(trial_num, double.sample(0.75))
+p_values_single <- replicate(trial_num, single.sample())
 ```
 
-Is there an inflation of false positives? How bad is it?
-
-> ANSWER
-
-Now modify this code so that you can investigate this "double the sample" rule in a bit more depth. Let's see what happens when you double the sample ANY time p > .05 (not just when p < .25), or when you do it only if p < .5 or < .75. How do these choices affect the false positive rate?
-
-HINT: Try to do this by making the function `double.sample` take the upper p value as an argument, so that you can pass this through dplyr.
-
-HINT 2: You may need more samples. Find out by looking at how the results change from run to run.
-
 ```{r}
+#plot 4 histograms with the same axes limits to compare the different sampling techniques
+hnl <- hist(p_values_double_nolimit, breaks=20, plot=FALSE) #create histogram with 0.05 bin increments
+first_bar_nl <- min(p_values_double_nolimit) #identify the bar for 0 to 0.05
+bin_nl <- as.numeric(cut(first_bar_nl, hnl$breaks)) #grab the bar for 0 to 0.05 
+
+h50 <- hist(p_values_double_0_5, breaks=20, plot=FALSE) #create histogram with 0.05 bin increments
+first_bar_05 <- min(p_values_double_0_5) #identify the bar for 0 to 0.05
+bin_50 <- as.numeric(cut(first_bar_05, h50$breaks)) #grab the bar for 0 to 0.05
+
+h75 <- hist(p_values_double_0_75, breaks=20, plot=FALSE) #create histogram with 0.05 bin increments
+first_bar_75 <- min(p_values_double_0_75) #identify the bar for 0 to 0.05
+bin_75 <- as.numeric(cut(first_bar_75, h75$breaks)) #grab the bar for 0 to 0.05 
+
+hsingle <- hist(p_values_single, breaks=20, plot=FALSE) #create histogram with 0.05 bin increments
+first_bar_single <- min(p_values_single) #identify the bar for 0 to 0.05
+bin_single <- as.numeric(cut(first_bar_single, hsingle$breaks)) #grab the bar for 0 to 0.05 
+
+par(mfrow=c(2, 2))
+plot(hnl, col = replace(rep("white", length(hnl$breaks) - 1), bin_nl, "blue"), ylim=c(0, 2000)) #add the blue bar for the area of interest
+text(hnl$mids[1], 20 + hnl$counts[1], labels=hnl$counts[1], adj=c(0.5, -0.5)) #label first bar count
+
+
+plot(h50, col = replace(rep("white", length(h50$breaks) - 1), bin_50, "blue"), ylim=c(0, 2000)) #add the blue bar for the area of interest
+text(h50$mids[1], 20 + h50$counts[1], labels=h50$counts[1], adj=c(0.5, -0.5)) #label first bar count
+
+plot(h75, col = replace(rep("white", length(h75$breaks) - 1), bin_75, "blue"), ylim=c(0, 2000)) #add the blue bar for the area of interest
+text(h75$mids[1], 20 + h75$counts[1], labels=h75$counts[1], adj=c(0.5, -0.5)) #label first bar count
+
+
+plot(hsingle, col = replace(rep("white", length(hsingle$breaks) - 1), bin_single, "blue"), ylim=c(0, 2000)) #add the blue bar for the area of interest
+text(hsingle$mids[1], 20 + hsingle$counts[1], labels=hsingle$counts[1], adj=c(0.5, -0.5)) #label first bar count
 ```
 
-What do you conclude on the basis of this simulation? How bad is this kind of data-dependent policy?
+> What do you conclude on the basis of this simulation? How bad is this kind of data-dependent policy?
 
-> ANSWER
+From this simulation we see there is a huge inflation in the number of significant results we will see if we use these different double sampling techniques. In the 20k trials run above, using a single sampling technique we would expect approximately 1k to be significant. But as we implement a double sampling technique, we start to see far greater numbers of significant results. When we double if the p-value of the original run is in the intervals 0.05 to 0.5, 0.05 to 0.75, or 0.05 and up, we see the number of signifant results increase to around 1600/20000. This is a pretty bad inflation of our results.
