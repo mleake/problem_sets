@@ -7,7 +7,7 @@ output:
     toc: true
 ---
 
-> This is problem set #3, in which we want you to integrate your knowledge of data wrangling with some basic simulation skills and some linear modeling.
+> This is problem set #4, in which we want you to integrate your knowledge of data wrangling with some basic simulation skills and some linear modeling.
 
 > For ease of reading, please separate your answers from our text by marking our text with the `>` character (indicating quotes). 
 
@@ -62,7 +62,7 @@ is_sig_vector <- sum(replicate(
 print(c("The number of significant results out of 10000 trials is: ", toString(is_sig_vector)), quote=FALSE)
 ```
 
-The mean number of significant results computed both ways is approximately 500, as expected.
+The proportion of significant results computed both ways is approximately 500/10000 = 0.05, as expected.
 
 > Ok, that was a bit boring. Let's try something more interesting - let's implement a p-value sniffing simulation, in the style of Simons, Nelson, & Simonsohn (2011).
 
@@ -205,4 +205,4 @@ text(hsingle$mids[1], 20 + hsingle$counts[1], labels=hsingle$counts[1], adj=c(0.
 
 > What do you conclude on the basis of this simulation? How bad is this kind of data-dependent policy?
 
-From this simulation we see there is a huge inflation in the number of significant results we will see if we use these different double sampling techniques. In the 20k trials run above, using a single sampling technique we would expect approximately 1k to be significant. But as we implement a double sampling technique, we start to see far greater numbers of significant results. When we double if the p-value of the original run is in the intervals 0.05 to 0.5, 0.05 to 0.75, or 0.05 and up, we see the number of signifant results increase to around 1600/20000. This is a pretty bad inflation of our results.
+From this simulation we see there is a huge inflation in the number of significant results we will see if we use these different double sampling techniques. In the 20k trials run above, using a single sampling technique we would expect approximately 1k to be significant. But as we implement a double sampling technique, we start to see far greater numbers of significant results. When we double if the p-value of the original run is in the intervals 0.05 to 0.5, 0.05 to 0.75, or 0.05 and up, we see the number of signifant results increase to around 1600/20000 = 0.08. This is a pretty bad inflation of our results.
